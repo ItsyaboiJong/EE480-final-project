@@ -8,6 +8,7 @@
 `define REGNUM	[7:0]
 `define MEMSIZE [65535:0]
 `define PID	[1:0]
+`define MEMDELAY 4
 
 // pid-dependent things
 `define	PID0	(pid)
@@ -61,6 +62,13 @@
 module processor(halt, reset, clk);
 output halt;
 input reset, clk;
+//slowmem
+reg mfc;
+reg `WORD rdata;
+reg `WORD addr, wdata;
+reg rnotw, strobe;
+reg [7:0] pend;
+reg `WORD raddr;
 
 reg `WORD r `REGSIZE;
 reg `WORD m `MEMSIZE;
@@ -77,6 +85,9 @@ wire teststall, retstall, writestall;
 reg `PID torf, preset, halts;
 reg `PRE pre `PID;
 reg pid;
+reg read;//strobe starter(1 = read, 0 = write)
+
+slowmem memory(mfc, rdata, addr, wdata, rnotw, strobe, clk);
 
 always @(posedge reset) begin
   //halt <= 0;
@@ -86,10 +97,18 @@ always @(posedge reset) begin
   `PC1 <= 16'h8000;
   `HALT0 <= 0;
   `HALT1 <= 0;
+  read = 1;//to start the strobe
   $readmemh0(r);
   $readmemh1(m);
 end
-
+always@(read) begin
+ strobe = 1;
+ rnotw = 1;
+end
+always@(!read) begin
+ strobe = 1;
+ rnotw = 0;
+end
 // Halted?
 assign halt = (HALT0 && HALT1);
 
@@ -100,7 +119,9 @@ assign teststall = (s1op == `OPTest);
 assign retstall = (s1op == `OPRet);
 
 // Instruction fetch interface
-assign ir = m[`PC0];
+//assign ir = m[`PC0];
+assign addr = `PC0;
+assign ir = rdata;
 assign op = {(ir `Opcode), (((ir `Opcode) == 0) ? ir[3:0] : 4'd0)};
 
 // Instruction fetch
@@ -229,8 +250,8 @@ end
 
 // Register read
 always @(posedge clk) begin
-  s2dv <= ((s1d == `NOREG) ? 0 : r[{`PID0, s1d}]);
-  s2sv <= ((s1s == `NOREG) ? 0 : r[{`PID0, s1s}]);
+  addr = {`PID0, s1d}); read = 1; rdata = s2dv;
+  addr = {`PID0, s1s}); read = 0; rdata = s2sv;
   s2d <= s1d;
   s2op <= s1op;
   s2immed <= s1immed;
@@ -239,20 +260,20 @@ end
 // ALU or data memory access and write
 always @(posedge clk) begin
   case (s2op)
-    `OPAdd: begin r[{`PID1, s2d}] <= s2dv + s2sv; end
-    `OPSub: begin r[{`PID1, s2d}] <= s2dv - s2sv; end
+    `OPAdd: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv + s2sv; end
+    `OPSub: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv - s2sv; end
     `OPTest: begin `TORF1 <= (s2sv != 0); end
-    `OPLt: begin r[{`PID1, s2d}] <= (s2dv < s2sv); end
-    `OPDup: begin r[{`PID1, s2d}] <= s2sv; end
-    `OPAnd: begin r[{`PID1, s2d}] <= s2dv & s2sv; end
-    `OPOr: begin r[{`PID1, s2d}] <= s2dv | s2sv; end
-    `OPXor: begin r[{`PID1, s2d}] <= s2dv ^ s2sv; end
-    `OPLoad: begin r[{`PID1, s2d}] <= m[s2sv]; end
-    `OPStore: begin m[s2dv] <= s2sv; end
+    `OPLt: begin addr = {`PID1, s2d} read = 0; wdata = (s2dv < s2sv); end
+    `OPDup: begin addr = {`PID1, s2d}; read = 0; wdata = s2sv; end
+    `OPAnd: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv & s2sv; end
+    `OPOr: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv | s2sv; end
+    `OPXor: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv ^ s2sv; end
+    `OPLoad: begin addr = {`PID1, s2d}; read = 0; wdata = m[s2sv]; end
+    `OPStore: begin addr = [s2dv]; read = 0; wdata = s2sv; end
     `OPPush,
-    `OPCall: begin r[{`PID1, s2d}] <= s2immed; end
+    `OPCall: begin addr = {`PID1, s2d}; read = 0; wdata = s2immed; end
     `OPGet,
-    `OPPut: begin r[{`PID1, s2d}] <= s2sv; end
+    `OPPut: begin addr = {`PID1, s2d}; read = 0; wdata = s2sv; end
   endcase
 end
 endmodule
@@ -269,6 +290,8 @@ reg `WORD m `MEMSIZE;
 initial begin
   pend <= 0;
   // put your memory initialization code here
+//  $readmemh0(r);
+  $readmemh1(m);
 end
 
 always @(posedge clk) begin
