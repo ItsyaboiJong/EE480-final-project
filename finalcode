@@ -63,8 +63,8 @@ module processor(halt, reset, clk);
 output halt;
 input reset, clk;
 //slowmem
-reg mfc;
-reg `WORD rdata;
+wire mfc;
+wire `WORD rdata;
 reg `WORD addr, wdata;
 reg rnotw, strobe;
 reg [7:0] pend;
@@ -110,7 +110,7 @@ always@(!read) begin
  rnotw = 0;
 end
 // Halted?
-assign halt = (HALT0 && HALT1);
+assign halt = (`HALT0 && `HALT1);
 
 // Stall for Test?
 assign teststall = (s1op == `OPTest);
@@ -250,8 +250,8 @@ end
 
 // Register read
 always @(posedge clk) begin
-  addr = {`PID0, s1d}); read = 1; rdata = s2dv;
-  addr = {`PID0, s1s}); read = 0; rdata = s2sv;
+  addr = {`PID0, s1d}; read = 1; rdata = s2dv;
+  addr = {`PID0, s1s}; read = 0; rdata = s2sv;
   s2d <= s1d;
   s2op <= s1op;
   s2immed <= s1immed;
@@ -263,13 +263,13 @@ always @(posedge clk) begin
     `OPAdd: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv + s2sv; end
     `OPSub: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv - s2sv; end
     `OPTest: begin `TORF1 <= (s2sv != 0); end
-    `OPLt: begin addr = {`PID1, s2d} read = 0; wdata = (s2dv < s2sv); end
+    `OPLt: begin addr = {`PID1, s2d}; read = 0; wdata = (s2dv < s2sv); end
     `OPDup: begin addr = {`PID1, s2d}; read = 0; wdata = s2sv; end
     `OPAnd: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv & s2sv; end
     `OPOr: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv | s2sv; end
     `OPXor: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv ^ s2sv; end
     `OPLoad: begin addr = {`PID1, s2d}; read = 0; wdata = m[s2sv]; end
-    `OPStore: begin addr = [s2dv]; read = 0; wdata = s2sv; end
+    `OPStore: begin addr = s2dv; read = 0; wdata = s2sv; end
     `OPPush,
     `OPCall: begin addr = {`PID1, s2d}; read = 0; wdata = s2immed; end
     `OPGet,
