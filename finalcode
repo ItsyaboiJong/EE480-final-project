@@ -120,7 +120,9 @@ assign retstall = (s1op == `OPRet);
 
 // Instruction fetch interface
 //assign ir = m[`PC0];
-assign addr = `PC0;
+always @(*) begin
+addr = `PC0;
+end
 assign ir = rdata;
 assign op = {(ir `Opcode), (((ir `Opcode) == 0) ? ir[3:0] : 4'd0)};
 
