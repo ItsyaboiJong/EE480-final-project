@@ -252,8 +252,8 @@ end
 
 // Register read
 always @(posedge clk) begin
-  addr = {`PID0, s1d}; read = 1; rdata = s2dv;
-  addr = {`PID0, s1s}; read = 0; rdata = s2sv;
+  addr = {`PID0, s1d}; read = 1; s2dv = rdata;
+  addr = {`PID0, s1s}; read = 0; s2sv = rdata;
   s2d <= s1d;
   s2op <= s1op;
   s2immed <= s1immed;
