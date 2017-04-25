@@ -84,8 +84,8 @@ always @(posedge reset) begin
   `SP1 <= 0;
   `PC0 <= 0;
   `PC1 <= 16'h8000;
- // `HALT0 <= 0;
-  //`HALT1 <= 0;
+  `HALT0 <= 0;
+  `HALT1 <= 0;
   $readmemh0(r);
   $readmemh1(m);
 end
@@ -181,7 +181,7 @@ always @(posedge clk) begin
     `OPSys: begin
       // basically idle this thread
       s0op <= `OPNOP;
-      HALT0 <= ((s0op == `OPNOP) && (s1op == `OPNOP) && (s2op == `OPNOP));
+      `HALT0 <= ((s0op == `OPNOP) && (s1op == `OPNOP) && (s2op == `OPNOP));
     end
     default: begin
       s0op <= op;
