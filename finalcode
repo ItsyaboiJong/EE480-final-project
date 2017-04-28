@@ -340,14 +340,14 @@ output wire mfc;
 output wire `WORD rdata;
 output reg strobesignal, rnotwsignal;
 output reg `WORD secaddr;
-input reg `WORD addr, wdata, 
-input reg rnotw, strobe, clk;
-input reg mfcsignal;
+input `WORD addr, wdata;
+input rnotw, strobe, clk;
+input mfcsignal;
 reg `WORD raddr;
 reg `DATA m `CACHESIZE;
 reg cachehitormiss = 0;
-reg validbit [`number - 1:0]
-reg dirtybit [`number - 1:0]
+reg validbit [`number - 1:0];
+reg dirtybit [`number - 1:0];
 
 initial begin
 for(i = 0; i < number; i = i + 1) begin
@@ -362,6 +362,7 @@ always @(posedge clk) begin
     raddr <= addr;
     if(validbit[raddr%`number] == 1 && m[raddr%`number][31:16] == raddr)begin
     	rdata <= m[raddr%`number][15:0];
+	cachehitormiss <= cachehitormiss + 1;
 	mfc <= 1;
 	end else if(validbit[raddr%`number] == 0) begin
 	strobesignal <= 1;
@@ -372,7 +373,7 @@ always @(posedge clk) begin
 		validbit[raddr%`number]<=1;
 		mfc <= 1;
 		end
-	end
+	
 	end else if(m[raddr%`number][31:16] != raddr)begin
 	strobesignal <= 1;
 	rnotwsignal <= 1;
@@ -381,13 +382,12 @@ always @(posedge clk) begin
 		m[raddr%`number] <= {rdata, wdata};
 		mfc <= 1;
 		end
-	end
 	end else begin
       // return invalid data
       rdata <= 16'hxxxx;
       mfc <= 0;
     end
-  end
+
 end
 endmodule
 
