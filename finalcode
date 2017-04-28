@@ -91,7 +91,17 @@ reg `PRE pre `PID;
 reg pid;
 reg read;//strobe starter(1 = read, 0 = write)
 
-slowmem memory(mfc, rdata, addr, wdata, rnotw, strobe, clk);
+reg mfc1;
+reg `WORD rdata1;
+reg strobesignal, rnotwsignal;
+reg `WORD secaddr;
+reg `WORD addr1, wdata1;
+reg rnotw1, strobe1, clk;
+reg mfcsignal;
+
+slowmem memory(mfcsignal, wdata1, addr1, wdata, rnotwsignal, strobesignal, clk);
+instructioncache inscache(mfc1, rdata1, addr1, wdata1, rnotw1, strobe1, clk, mfcsignal, strobesignal, rnotwsignal);
+
 
 always @(posedge reset) begin
   //halt <= 0;
@@ -125,9 +135,9 @@ assign retstall = (s1op == `OPRet);
 // Instruction fetch interface
 //assign ir = m[`PC0];
 always @(*) begin
-addr = `PC0;
+addr1 = `PC0;
 end
-assign ir = rdata;
+assign ir = rdata1;
 assign op = {(ir `Opcode), (((ir `Opcode) == 0) ? ir[3:0] : 4'd0)};
 
 // Instruction fetch
