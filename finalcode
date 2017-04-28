@@ -9,6 +9,10 @@
 `define MEMSIZE [65535:0]
 `define PID	[1:0]
 `define MEMDELAY 4
+`define CACHESIZE [`number - 1:0]
+`define number 8
+`define size 32
+`define DATA [`size - 1:0]
 
 // pid-dependent things
 `define	PID0	(pid)
@@ -323,6 +327,62 @@ always @(posedge clk) begin
         pend <= pend - 1;
       end
     end else begin
+      // return invalid data
+      rdata <= 16'hxxxx;
+      mfc <= 0;
+    end
+  end
+end
+endmodule
+
+module instructioncahce(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal);
+output wire mfc;
+output wire `WORD rdata;
+output reg strobesignal, rnotwsignal;
+output reg `WORD secaddr;
+input reg `WORD addr, wdata, 
+input reg rnotw, strobe, clk;
+input reg mfcsignal;
+reg `WORD raddr;
+reg `DATA m `CACHESIZE;
+reg cachehitormiss = 0;
+reg validbit [`number - 1:0]
+reg dirtybit [`number - 1:0]
+
+initial begin
+for(i = 0; i < number; i = i + 1) begin
+validbit = 0;
+dirtybit = 0;
+end
+end
+
+always @(posedge clk) begin
+  if (strobe && rnotw) begin
+    // new read request
+    raddr <= addr;
+    if(validbit[raddr%`number] == 1 && m[raddr%`number][31:16] == raddr)begin
+    	rdata <= m[raddr%`number][15:0];
+	mfc <= 1;
+	end else if(validbit[raddr%`number] == 0) begin
+	strobesignal <= 1;
+	rnotwsignal <= 1;
+	secaddr <= raddr;
+	if(mfcsignal == 1)begin
+		m[raddr%`number] <= {rdata, wdata};
+		validbit[raddr%`number]<=1;
+		mfc <= 1;
+		end
+	end
+	end else if(m[raddr%`number][31:16] != raddr)begin
+	strobesignal <= 1;
+	rnotwsignal <= 1;
+	secaddr <= raddr;
+	if(mfcsignal == 1)begin
+		m[raddr%`number] <= {rdata, wdata};
+		mfc <= 1;
+		end
+	end
+	end else begin
       // return invalid data
       rdata <= 16'hxxxx;
       mfc <= 0;
