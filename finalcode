@@ -320,7 +320,6 @@ always @(posedge clk) begin
       // do write
       m[addr] <= wdata;
     end
-
     // pending read?
     if (pend) begin
       // write satisfies pending read
@@ -345,7 +344,8 @@ always @(posedge clk) begin
 end
 endmodule
 
-module instructioncache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal);
+module instructioncache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal, memdata, memflag);
+output reg memdata, memflag;
 output reg mfc;
 output reg `WORD rdata;
 output reg strobesignal, rnotwsignal;
@@ -399,6 +399,71 @@ always @(posedge clk) begin
       mfc <= 0;
     end
     end
+end
+endmodule
+
+module datacache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal);
+output reg mfc;
+output reg `WORD rdata;
+output reg strobesignal, rnotwsignal;
+output reg `WORD secaddr;
+input `WORD addr, wdata;
+input rnotw, strobe, clk;
+input mfcsignal;
+reg `WORD raddr;
+reg `DATA m `CACHESIZE;
+reg cachehitormiss = 0;
+reg validbit [`number - 1:0];
+reg dirtybit [`number - 1:0];
+integer i;
+
+initial begin
+for(i = 0; i < `number; i = i + 1) begin
+validbit[i] = 0;
+dirtybit[i] = 0;
+end
+end
+
+
+always @(posedge clk) begin
+  if (strobe && rnotw) begin
+    // new read request
+    raddr <= addr;
+    if(validbit[raddr%`number] == 1 && m[raddr%`number][31:16] == raddr)begin
+    	rdata <= m[raddr%`number][15:0];
+	cachehitormiss <= cachehitormiss + 1;
+	mfc <= 1;
+	end else if(validbit[raddr%`number] == 0) begin
+	strobesignal <= 1;
+	rnotwsignal <= 1;
+	secaddr <= raddr;
+	if(mfcsignal == 1)begin
+		m[raddr%`number] <= {rdata, wdata};
+		validbit[raddr%`number]<=1;
+		mfc <= 1;
+		end
+	
+	end else if(m[raddr%`number][31:16] != raddr)begin
+	strobesignal <= 1;
+	rnotwsignal <= 1;
+	secaddr <= raddr;
+	if(mfcsignal == 1)begin
+		m[raddr%`number] <= {rdata, wdata};
+		mfc <= 1;
+		end
+	end else begin
+      // return invalid data
+      rdata <= 16'hxxxx;
+      mfc <= 0;
+    end
+    end
+    //write-through
+	if (strobe && !rnotw) begin
+		m[raddr%`number][15:0] <= wdata;
+		memflag <= 1;
+		secaddr <= raddr;
+		memdata <= wdata;
+	end
 end
 endmodule
 
