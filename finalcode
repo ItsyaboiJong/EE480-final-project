@@ -58,6 +58,66 @@
 `define OPPut	{4'h9, 4'h0}
 `define OPPop	{4'ha, 4'h0}
 `define OPPre	{4'hb, 4'h0}
+// basic sizes of things
+`define WORD	[15:0]
+`define Opcode	[15:12]
+`define Immed	[11:0]
+`define OP	[7:0]
+`define PRE	[3:0]
+`define REGSIZE [511:0] // 256 for each PID
+`define REGNUM	[7:0]
+`define MEMSIZE [65535:0]
+`define PID	[1:0]
+`define MEMDELAY 4
+`define CACHESIZE [`number - 1:0]
+`define number 8
+`define size 32
+`define DATA [`size - 1:0]
+
+// pid-dependent things
+`define	PID0	(pid)
+`define	PID1	(!pid)
+`define	PC0	pc[`PID0]
+`define	PC1	pc[`PID1]
+`define	PRESET0	preset[`PID0]
+`define	PRESET1	preset[`PID1]
+`define	PRE0	pre[`PID0]
+`define	PRE1	pre[`PID1]
+`define	TORF0	torf[`PID0]
+`define	TORF1	torf[`PID1]
+`define	SP0	sp[`PID0]
+`define	SP1	sp[`PID1]
+`define HALT0	halts[`PID0]
+`define	HALT1	halts[`PID1]
+
+// opcode values hacked into state numbers
+`define OPAdd	{4'h0, 4'h0}
+`define OPSub	{4'h0, 4'h1}
+`define OPTest	{4'h0, 4'h2}
+`define OPLt	{4'h0, 4'h3}
+
+`define OPDup	{4'h0, 4'h4}
+`define OPAnd	{4'h0, 4'h5}
+`define OPOr	{4'h0, 4'h6}
+`define OPXor	{4'h0, 4'h7}
+
+`define OPLoad	{4'h0, 4'h8}
+`define OPStore {4'h0, 4'h9}
+
+`define OPRet	{4'h0, 4'ha}
+`define OPSys	{4'h0, 4'hb}
+
+`define OPPush	{4'h1, 4'h0}
+
+`define OPCall	{4'h4, 4'h0}
+`define OPJump	{4'h5, 4'h0}
+`define OPJumpF {4'h6, 4'h0}
+`define OPJumpT {4'h7, 4'h0}
+
+`define OPGet	{4'h8, 4'h0}
+`define OPPut	{4'h9, 4'h0}
+`define OPPop	{4'ha, 4'h0}
+`define OPPre	{4'hb, 4'h0}
 
 `define OPNOP	{4'hf, 4'hf}
 
@@ -99,10 +159,37 @@ reg `WORD addr1, wdata1;
 reg rnotw1, strobe1;
 wire mfcsignal;
 
-slowmem memory(mfcsignal, rdata, addr1, wdata, rnotwsignal, strobesignal, clk);
+reg`WORD memdata; 
+reg memflag;
+wiremfc2;
+wire`WORD rdata2;
+wire strobesignal2, rnotwsignal2;
+reg `WORD secaddr2;
+reg `WORD addr2, wdata2;
+reg rnotw2, strobe2;
+wire mfcsignal2;
+
+slowmem memory(mfcsignal, rdata, addr, wdata, rnotwsignal, strobesignal, clk);
 instructioncache inscache(mfc1, rdata1, addr1, rdata, rnotw1, strobe1, clk, mfcsignal, strobesignal, rnotwsignal);
+datacache datac(mfc2, rdata2, addr2, wdata2, rnotw2, strobe2, clk, mfcsignal2, strobesignal2, rnotwsignal2, memflag, memdata, slowmemdata);
 
-
+always @(rnotwsignal1, rnotwsignal2) begin
+	if(rnotwsignal2) begin
+	strobesignal <= strobesignal2;
+	rnotwsignal <= rnotwsignal2;
+	addr <= addr2;
+	if(memflag == 0) begin
+		wdata2 <= rdata;
+		mfcsignal2 <= mfcsignal;
+		wdata <= slowmemdata;
+	end else begin
+	strobesignal <= strobesignal1;
+	rnotwsignal <= rnotwsignal1;
+	addr <= addr1;
+	wdata1 <= rdata;
+	mfcsignal1 <= mfcsignal;
+	end
+	end
 always @(posedge reset) begin
   //halt <= 0;
   `SP0 <= 0;
@@ -115,14 +202,14 @@ always @(posedge reset) begin
   $readmemh0(r);
   $readmemh1(m);
 end
-always@(read) begin
- strobe = 1;
- rnotw = 1;
-end
-always@(!read) begin
- strobe = 1;
- rnotw = 0;
-end
+//always@(read) begin
+ //strobe = 1;
+ //rnotw = 1;
+//end
+//always@(!read) begin
+// strobe = 1;
+// rnotw = 0;
+//end
 // Halted?
 assign halt = (`HALT0 && `HALT1);
 
@@ -266,8 +353,10 @@ end
 
 // Register read
 always @(posedge clk) begin
-  addr = {`PID0, s1d}; read = 1; s2dv = rdata;
-  addr = {`PID0, s1s}; read = 0; s2sv = rdata;
+  strobesignal2 <= 1;
+  rnotwsignal2 <= 1;
+  addr2 = {`PID0, s1d}; s2dv = rdata;
+  addr2 = {`PID0, s1s}; s2sv = rdata;
   s2d <= s1d;
   s2op <= s1op;
   s2immed <= s1immed;
@@ -275,21 +364,23 @@ end
 
 // ALU or data memory access and write
 always @(posedge clk) begin
+	strobesignal2 <= 1;
+	rnotwsignal2 <= 0;
   case (s2op)
-    `OPAdd: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv + s2sv; end
-    `OPSub: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv - s2sv; end
+    `OPAdd: begin addr2 = {`PID1, s2d}; memdata = s2dv + s2sv; end
+    `OPSub: begin addr2 = {`PID1, s2d}; memdata = s2dv - s2sv; end
     `OPTest: begin `TORF1 <= (s2sv != 0); end
-    `OPLt: begin addr = {`PID1, s2d}; read = 0; wdata = (s2dv < s2sv); end
-    `OPDup: begin addr = {`PID1, s2d}; read = 0; wdata = s2sv; end
-    `OPAnd: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv & s2sv; end
-    `OPOr: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv | s2sv; end
-    `OPXor: begin addr = {`PID1, s2d}; read = 0; wdata = s2dv ^ s2sv; end
-    `OPLoad: begin addr = {`PID1, s2d}; read = 0; wdata = m[s2sv]; end
-    `OPStore: begin addr = s2dv; read = 0; wdata = s2sv; end
+    `OPLt: begin addr2 = {`PID1, s2d};  memdata = (s2dv < s2sv); end
+    `OPDup: begin addr2 = {`PID1, s2d}; memdata = s2sv; end
+    `OPAnd: begin addr2 = {`PID1, s2d}; memdata = s2dv & s2sv; end
+    `OPOr: begin addr2 = {`PID1, s2d};  memdata = s2dv | s2sv; end
+    `OPXor: begin addr2 = {`PID1, s2d}; memdata = s2dv ^ s2sv; end
+    `OPLoad: begin addr2 = {`PID1, s2d}; memdata = m[s2sv]; end
+    `OPStore: begin addr2 = s2dv; memdata = s2sv; end
     `OPPush,
-    `OPCall: begin addr = {`PID1, s2d}; read = 0; wdata = s2immed; end
+    `OPCall: begin addr2 = {`PID1, s2d}; memdata = s2immed; end
     `OPGet,
-    `OPPut: begin addr = {`PID1, s2d}; read = 0; wdata = s2sv; end
+    `OPPut: begin addr2 = {`PID1, s2d}; memdata = s2sv; end
   endcase
 end
 endmodule
@@ -344,8 +435,7 @@ always @(posedge clk) begin
 end
 endmodule
 
-module instructioncache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal, memdata, memflag);
-output reg memdata, memflag;
+module instructioncache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal);
 output reg mfc;
 output reg `WORD rdata;
 output reg strobesignal, rnotwsignal;
@@ -402,7 +492,10 @@ always @(posedge clk) begin
 end
 endmodule
 
-module datacache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal);
+module datacache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal, memflag, memdata, slowmemdata);
+input `WORD memdata; 
+output reg `WORD slowmemdata
+output reg memflag;
 output reg mfc;
 output reg `WORD rdata;
 output reg strobesignal, rnotwsignal;
@@ -459,10 +552,10 @@ always @(posedge clk) begin
     end
     //write-through
 	if (strobe && !rnotw) begin
-		m[raddr%`number][15:0] <= wdata;
+		m[raddr%`number][15:0] <= memdata;
 		memflag <= 1;
 		secaddr <= raddr;
-		memdata <= wdata;
+		slowmemdata <= memdata;
 	end
 end
 endmodule
