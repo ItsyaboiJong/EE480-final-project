@@ -153,15 +153,17 @@ reg read;//strobe starter(1 = read, 0 = write)
 
 wire mfc1;
 wire `WORD rdata1;
-wire strobesignal, rnotwsignal;
-reg `WORD secaddr;
+reg strobesignal1; 
+reg rnotwsignal1;
+reg `WORD secaddr1;
 reg `WORD addr1, wdata1;
 reg rnotw1, strobe1;
-wire mfcsignal;
+wire mfcsignal1;
 
 reg`WORD memdata; 
-reg memflag;
-wiremfc2;
+wire `WORD slowmemdata;
+wire memflag;
+wire mfc2;
 wire`WORD rdata2;
 wire strobesignal2, rnotwsignal2;
 reg `WORD secaddr2;
@@ -169,9 +171,9 @@ reg `WORD addr2, wdata2;
 reg rnotw2, strobe2;
 wire mfcsignal2;
 
-slowmem memory(mfcsignal, rdata, addr, wdata, rnotwsignal, strobesignal, clk);
-instructioncache inscache(mfc1, rdata1, addr1, rdata, rnotw1, strobe1, clk, mfcsignal, strobesignal, rnotwsignal);
-datacache datac(mfc2, rdata2, addr2, wdata2, rnotw2, strobe2, clk, mfcsignal2, strobesignal2, rnotwsignal2, memflag, memdata, slowmemdata);
+slowmem memory(mfc, rdata, addr, wdata, rnotw, strobe, clk);
+instructioncache inscache(mfc1, rdata1, addr1, wdata1, rnotw1, strobe1, clk, mfcsignal1, strobesignal1, rnotwsignal1, secaddr1);
+datacache datac(mfc2, rdata2, addr2, wdata2, rnotw2, strobe2, clk, mfcsignal2, strobesignal2, rnotwsignal2, secaddr2, memflag, memdata, slowmemdata);
 
 always @(rnotwsignal1, rnotwsignal2) begin
 	if(rnotwsignal2) begin
@@ -190,6 +192,7 @@ always @(rnotwsignal1, rnotwsignal2) begin
 	mfcsignal1 <= mfcsignal;
 	end
 	end
+end
 always @(posedge reset) begin
   //halt <= 0;
   `SP0 <= 0;
@@ -435,7 +438,7 @@ always @(posedge clk) begin
 end
 endmodule
 
-module instructioncache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal);
+module instructioncache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal, secaddr);
 output reg mfc;
 output reg `WORD rdata;
 output reg strobesignal, rnotwsignal;
@@ -492,9 +495,9 @@ always @(posedge clk) begin
 end
 endmodule
 
-module datacache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal, memflag, memdata, slowmemdata);
+module datacache(mfc, rdata, addr, wdata, rnotw, strobe, clk, mfcsignal, strobesignal, rnotwsignal, secaddr, memflag, memdata, slowmemdata);
 input `WORD memdata; 
-output reg `WORD slowmemdata
+output reg `WORD slowmemdata;
 output reg memflag;
 output reg mfc;
 output reg `WORD rdata;
