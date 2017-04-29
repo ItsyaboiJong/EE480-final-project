@@ -153,12 +153,12 @@ reg read;//strobe starter(1 = read, 0 = write)
 
 wire mfc1;
 wire `WORD rdata1;
-reg strobesignal1; 
-reg rnotwsignal1;
-reg `WORD secaddr1;
+wire strobesignal1; 
+wire rnotwsignal1;
+wire `WORD secaddr1;
 reg `WORD addr1, wdata1;
 reg rnotw1, strobe1;
-wire mfcsignal1;
+reg mfcsignal1;
 
 reg`WORD memdata; 
 wire `WORD slowmemdata;
@@ -166,10 +166,10 @@ wire memflag;
 wire mfc2;
 wire`WORD rdata2;
 wire strobesignal2, rnotwsignal2;
-reg `WORD secaddr2;
+wire `WORD secaddr2;
 reg `WORD addr2, wdata2;
 reg rnotw2, strobe2;
-wire mfcsignal2;
+reg mfcsignal2;
 
 slowmem memory(mfc, rdata, addr, wdata, rnotw, strobe, clk);
 instructioncache inscache(mfc1, rdata1, addr1, wdata1, rnotw1, strobe1, clk, mfcsignal1, strobesignal1, rnotwsignal1, secaddr1);
@@ -177,19 +177,19 @@ datacache datac(mfc2, rdata2, addr2, wdata2, rnotw2, strobe2, clk, mfcsignal2, s
 
 always @(rnotwsignal1, rnotwsignal2) begin
 	if(rnotwsignal2) begin
-	strobesignal <= strobesignal2;
-	rnotwsignal <= rnotwsignal2;
+	strobe <= strobesignal2;
+	rnotw <= rnotwsignal2;
 	addr <= addr2;
 	if(memflag == 0) begin
 		wdata2 <= rdata;
-		mfcsignal2 <= mfcsignal;
+		mfcsignal2 <= mfc;
 		wdata <= slowmemdata;
 	end else begin
-	strobesignal <= strobesignal1;
-	rnotwsignal <= rnotwsignal1;
+	strobe <= strobesignal1;
+	rnotw <= rnotwsignal1;
 	addr <= addr1;
 	wdata1 <= rdata;
-	mfcsignal1 <= mfcsignal;
+	mfcsignal1 <= mfc;
 	end
 	end
 end
@@ -232,6 +232,8 @@ assign op = {(ir `Opcode), (((ir `Opcode) == 0) ? ir[3:0] : 4'd0)};
 
 // Instruction fetch
 always @(posedge clk) begin
+strobe1 <= 1;
+rnotw1 <= 1;
   // set immed, accounting for pre
   case (op)
     `OPPre: begin
@@ -356,8 +358,8 @@ end
 
 // Register read
 always @(posedge clk) begin
-  strobesignal2 <= 1;
-  rnotwsignal2 <= 1;
+  strobe2 <= 1;
+  rnotw2 <= 1;
   addr2 = {`PID0, s1d}; s2dv = rdata;
   addr2 = {`PID0, s1s}; s2sv = rdata;
   s2d <= s1d;
@@ -367,8 +369,8 @@ end
 
 // ALU or data memory access and write
 always @(posedge clk) begin
-	strobesignal2 <= 1;
-	rnotwsignal2 <= 0;
+	strobe2 <= 1;
+	rnotw2 <= 0;
   case (s2op)
     `OPAdd: begin addr2 = {`PID1, s2d}; memdata = s2dv + s2sv; end
     `OPSub: begin addr2 = {`PID1, s2d}; memdata = s2dv - s2sv; end
